@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name       Manga Loader
 // @namespace  https://github.com/fuzetsu/manga-loader
-// @version    1.11.29
+// @version    1.16.29
 // @description  Support for over 70 sites! Loads manga chapter into one page in a long strip format, supports switching chapters, minimal script with no dependencies, easy to implement new sites, loads quickly and works on mobile devices through bookmarklet
 // @copyright  2016+, fuzetsu
 // @noframes
@@ -1500,7 +1500,7 @@ var updateObj = function(orig, ext) {
   return orig;
 };
 
-var extractInfo = function(selector, mod, context) {
+var extractInfo = function(selector, mod, context, getChildren=false) {
   selector = this[selector] || selector;
   if (typeof selector === 'function') {
     return selector.call(this, context);
@@ -1508,6 +1508,12 @@ var extractInfo = function(selector, mod, context) {
   var elem = getEl(selector, context),
       option;
   mod = mod || {};
+  if (getChildren) {
+    console.log(context)
+    console.log(selector);
+    console.log(elem);
+    return elem.children;
+  }
   if (elem) {
     switch (elem.nodeName.toLowerCase()) {
       case 'img':
@@ -2164,15 +2170,19 @@ var loadManga = function(imp) {
       }),
       xhr = new XMLHttpRequest(),
       d = document.implementation.createHTMLDocument(),
-      addAndLoad = function(img, next) {
+      addAndLoad = function(img, next, inc_page=true) {
         if(!img) throw new Error('failed to retrieve img for page ' + curPage);
         updateStats();
         addImage(img, UI.images, curPage, function() {
-          pagesLoaded += 1;
-          updateStats();
+            if (inc_page) {
+                pagesLoaded += 1;
+                updateStats();
+            }
         });
-        if(!next && curPage < numPages) throw new Error('failed to retrieve next url for page ' + curPage);
-        loadNextPage(next);
+        if (inc_page) {
+            if(!next && curPage < numPages) throw new Error('failed to retrieve next url for page ' + curPage);
+            loadNextPage(next);
+        }
       },
       updateStats = function() {
         updateObj(pageStats, {
@@ -2187,10 +2197,24 @@ var loadManga = function(imp) {
       },
       getPageInfo = function() {
         var page = d.body;
+        let imgInChildren = ('toImgs' in imp);
+        let imgObj = ex('img', imp.imgmod, page, imgInChildren), // URL | [Node]
+            nextUrl = ex('next', null, page);
         d.body.innerHTML = xhr.response;
         try {
           // find image and link to next page
-          addAndLoad(ex('img', imp.imgmod, page), ex('next', null, page));
+          if (imgInChildren) {
+            console.log('mutiple pics')
+            let imgs = imp.toImgs(imgObj);
+            for (let i = 0; i < imgs.length - 1; i++) {
+              addAndLoad(imgs[i], 'whatever', false);
+            }
+            addAndLoad(imgs[imgs.length - 1], nextUrl);
+          } else {
+            console.log('single pic')
+            addAndLoad(imgObj, nextUrl);
+          }
+
         } catch (e) {
           if (xhr.status == 503 && retries > 0) {
             log('xhr status ' + xhr.status + ' retrieving ' + xhr.responseURL + ', ' + retries-- + ' retries remaining');
@@ -2278,7 +2302,19 @@ var loadManga = function(imp) {
     }, 100));
   }
 
-  addAndLoad(imgUrl, nextUrl);
+  var imgInChildren = ('toImgs' in imp),
+      imgObj = ex('img', imp.imgmod, null, imgInChildren);
+  if (imgInChildren) {
+    console.log('first mutiples pics')
+    let imgs = imp.toImgs(imgObj);
+    for (let i = 0; i < imgs.length - 1; i++) {
+      addAndLoad(imgs[i], 'whatever', false);
+    }
+    addAndLoad(imgs[imgs.length - 1], nextUrl);
+  } else {
+    console.log('first single pic')
+    addAndLoad(imgUrl, nextUrl);
+  }
 
 };
 
