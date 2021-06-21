@@ -2265,7 +2265,7 @@ var loadManga = function(imp) {
       lastUrl, UI, resumeUrl, retries;
 
   let imgInChildren = ('toImgs' in imp);
-  let imgObj = ex('img', imp.imgmod, undefined, imgInChildren), nextUrl = ex('next');
+  let imgObj = ex('img', imp.imgmod, undefined, imgInChildren), nextUrl = ex('next'); // undefined != null
   if (!imgObj || (!nextUrl && curPage < numPages)) {
     log('failed to retrieve', 'exit');
     return;
